@@ -1,0 +1,26 @@
+filebeat.inputs:
+- type: filestream
+  id: app-logs
+  enable: true
+  paths:
+  - /usr/share/filebeat/logs/*.log
+  parsers:
+  - ndjson:
+      target: ""
+      add_error_key: true
+  fields:
+    service: "logs"
+  fields_under_root: true
+
+processors:
+  - drop_fields:
+      fields: ["agent.ephemeral_id","agent.hostname","agent.type","agent.version", "ecs", "log.offset", "host"]
+
+output.kafka:
+  hosts: [ "kafka:29092" ]
+  topic: 'app-logs'
+  partition.round_robin:
+    reachable_only: false
+  required_acks: "1"
+  compression: "gzip"
+  max_message_bytes: "1000000"
