@@ -9,3 +9,4 @@ gen
 
 /app_logs
 app_logs!/app_logs/1.log
+/default.etcd/
