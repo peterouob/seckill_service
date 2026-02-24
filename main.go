@@ -9,13 +9,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/peterouob/seckill_service/router"
+	"github.com/peterouob/seckill_service/internal/controller"
+	"github.com/peterouob/seckill_service/internal/repo"
+	"github.com/peterouob/seckill_service/internal/router"
+	"github.com/peterouob/seckill_service/internal/service"
+	"github.com/peterouob/seckill_service/pkg/database"
 )
 
 func main() {
-	r := gin.Default()
-	router.InitRouter(r)
+
+	user := newUser()
+
+	r := router.InitRouter(user)
 
 	server := &http.Server{
 		Addr:    ":8081",
@@ -24,6 +29,8 @@ func main() {
 
 	serverErrors := make(chan error, 1)
 	go func() {
+		database.ConnRedis()
+		database.ConnPostgresql()
 		log.Println("Starting server ...")
 		serverErrors <- server.ListenAndServe()
 	}()
@@ -43,4 +50,12 @@ func main() {
 			_ = server.Close()
 		}
 	}
+}
+
+func newUser() *controller.UserController {
+	db := database.ConnPostgresql()
+	userRepo := repo.NewUserRepo(db)
+	userService := service.NewUserService(userRepo)
+	userController := controller.NewUserController(userService)
+	return userController
 }
