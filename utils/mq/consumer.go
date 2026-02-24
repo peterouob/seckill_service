@@ -63,9 +63,7 @@ func NewConsumer(groupId string, topic []string, batchSize int, flushTime time.D
 }
 
 func (c *Consumer) StartConsume() {
-	c.wg.Add(1)
 	go func() {
-		defer c.wg.Done()
 		for {
 			if err := c.consumer.Consume(c.ctx, c.topic, c.handler); err != nil {
 				if errors.Is(err, sarama.ErrClosedConsumerGroup) {
@@ -82,7 +80,7 @@ func (c *Consumer) StartConsume() {
 				return
 			}
 
-			c.handler.ready = make(chan bool)
+			close(c.handler.ready)
 		}
 	}()
 

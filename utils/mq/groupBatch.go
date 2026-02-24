@@ -90,16 +90,16 @@ func (l *ConsumerGroup) commit(session sarama.ConsumerGroupSession, batch []*sar
 	//if errors.Is(model.ErrPipe, model.RunScript(l.ctx, counts)) {
 	//	log.Println("error in run script")
 	//}
-	var order model.Order
+	var orders []model.Order
 	for _, topic := range batch {
+		var order model.Order
 		if err := json.Unmarshal(topic.Value, &order); err != nil {
 			logs.Error("error to unmarshal json order", err)
 		}
+		orders = append(orders, order)
 	}
 
-	log.Println(order)
-
-	if err := l.db.Create(&order).Error; err != nil {
+	if err := l.db.Create(&orders).Error; err != nil {
 		logs.Error("error to create order", err)
 	}
 
