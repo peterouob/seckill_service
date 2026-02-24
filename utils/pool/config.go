@@ -2,10 +2,7 @@
 package pool
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"google.golang.org/grpc"
@@ -52,12 +49,7 @@ var DefaultOption = Option{
 }
 
 func Dial(addr string) (*grpc.ClientConn, error) {
-	cancelCtx, cancel := context.WithTimeout(context.Background(), DialTimeout)
-	defer cancel()
-	g, err := grpc.NewClient(addr, grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
-		ctx = cancelCtx
-		return (&net.Dialer{}).DialContext(ctx, "tcp", addr)
-	}),
+	g, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithConnectParams(MaxBackoffDelay),
 		grpc.WithInitialWindowSize(InitialWindowSize),
@@ -68,10 +60,11 @@ func Dial(addr string) (*grpc.ClientConn, error) {
 			Time:                KeepAliveTime,
 			Timeout:             KeepAliveTimeout,
 			PermitWithoutStream: true,
-		}))
+		}),
+	)
 
 	if err != nil {
-		return nil, errors.New(fmt.Sprint("failed to create gRPC client: ", err))
+		return nil, fmt.Errorf("failed to create gRPC client: %w", err)
 	}
 	return g, nil
 }
