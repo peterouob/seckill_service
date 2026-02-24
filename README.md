@@ -1,5 +1,19 @@
 ## 目前決定先以庫存時間夠的話思考如何選位
 
+## Current
+
+- [x] avoid the oversell (use jmeter test)
+- [x] ensure the consistency between Redis and SQL
+- [x] use grpc for user service
+- [x] use etcd for service discovery
+- [x] use http gateway(Gin package) for external request
+- [x] use kafka,logstash,filebeat and elasticsearch for auto stor log
+- [x] implement the async producer and batch consumer for kafka
+- [x] use docker for environment setup
+- [x] implement the grpc pool for better performance
+
+
+## **My Though**
 ### Server Architecture
 1. etcd -> grpc -> http gateway
 
@@ -27,13 +41,13 @@
 
 ## Work flow
 
-1. **Request Phase**: 
+1. **Request Phase**:
    - User initiates a seckill request.
 2. **Redis Layer (Atomic Operation via Lua Script)**:
    - **Duplicate Check**: Use `SISMEMBER` (Redis Set) in Lua to atomically check if `user_id` exists in the buyer list. This prevents duplicate purchases more reliably than a Bloom filter (no false positives).
    - **Stock Check**: Verify if stock > 0.
    - **Execution**: If valid, perform `DECR` (stock) and `SADD` (add user to buyer list) atomically.
-   - **Result**: 
+   - **Result**:
        - If failed (duplicate or no stock) -> Return Error Page immediately.
        - If success -> Proceed to async processing.
 3. **Async Processing (Traffic Shaping)**:
@@ -62,3 +76,5 @@
 ### Version 3: High Availability & Observability
 1. **Service Governance**: Use etcd for advanced service discovery and load balancing to enhance gRPC server reliability.
 2. **Observability**: Deploy Prometheus and Grafana for real-time metrics (QPS, Latency, Stock levels) and Jaeger for distributed tracing to identify bottlenecks.
+
+## 降級先以註冊服務跟其他為優先
