@@ -1,4 +1,4 @@
-package model
+package domain
 
 type UserLoginReq struct {
 	Username string `json:"username"`
