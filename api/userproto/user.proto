@@ -22,28 +22,7 @@ message UserRegisterResp {
   string msg = 1;
 }
 
-message TokenValidRequest {
-  string token = 1;
-}
-
-message TokenValidResponse {
-  int64 id = 1;
-  string msg = 2;
-}
-
-
-message TokenTestRequest {
-
-}
-
-message TokenTestResponse {
-  string msg = 1;
-}
-
-
 service UserService {
   rpc UserLogin(UserLoginReq) returns (UserLoginResp){};
   rpc UserRegister(UserRegisterReq) returns (UserRegisterResp) {};
-  rpc TokenValid(TokenValidRequest) returns (TokenValidResponse) {};
-  rpc TokenTest(TokenTestRequest) returns (TokenTestResponse) {};
 }

@@ -28,7 +28,7 @@ func main() {
 	ctl := controller.NewSeckillController(srv)
 
 	consumer := mq.NewConsumer("seckill", []string{"order"}, 1000, 1*time.Second, db)
-
+	defer consumer.Close()
 	go func() {
 		consumer.StartConsume()
 	}()
