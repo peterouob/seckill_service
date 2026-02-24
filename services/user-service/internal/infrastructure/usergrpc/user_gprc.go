@@ -36,7 +36,7 @@ func (u *UserGrpcHandler) UserRegister(ctx context.Context, in *userproto.UserRe
 		Password:      in.GetPassword(),
 		CheckPassword: in.GetCheckPassword(),
 	}
-	u.userService.Register(ctx, user)
+	_ = u.userService.Register(ctx, user)
 	return &userproto.UserRegisterResp{
 		Msg: "success",
 	}, nil

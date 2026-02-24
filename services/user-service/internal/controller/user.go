@@ -45,3 +45,30 @@ func (u *UserController) Login(c *gin.Context) {
 
 	c.JSON(200, gin.H{"msg": resp})
 }
+
+func (u *UserController) Register(c *gin.Context) {
+	var registerReq model.UserRegisterReq
+	if err := c.ShouldBindJSON(&registerReq); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	grpcReq := &userproto.UserRegisterReq{
+		Username:      registerReq.Username,
+		Password:      registerReq.Password,
+		CheckPassword: registerReq.CheckPassword,
+	}
+
+	resp, err := u.grpcClient.UserRegister(context.Background(), grpcReq)
+	if err != nil {
+		state, ok := status.FromError(err)
+		if ok && state.Code() == codes.Unauthenticated {
+			c.JSON(401, gin.H{"error": "Invalid credentials"})
+			return
+		}
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"msg": resp})
+}

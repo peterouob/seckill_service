@@ -2,14 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/peterouob/seckill_service/services/user-service/internal/infrastructure/repository"
 	"github.com/peterouob/seckill_service/services/user-service/pkg/model"
+	"github.com/peterouob/seckill_service/utils/logs"
 )
 
 type UserService interface {
 	Login(context.Context, model.UserLoginReq)
-	Register(context.Context, model.UserRegisterReq)
+	Register(context.Context, model.UserRegisterReq) error
 }
 
 type userServiceImpl struct {
@@ -26,6 +28,13 @@ func (u *userServiceImpl) Login(ctx context.Context, req model.UserLoginReq) {
 
 }
 
-func (u *userServiceImpl) Register(ctx context.Context, req model.UserRegisterReq) {
+var ErrNotSamePassword = errors.New("password and check password not the same")
 
+func (u *userServiceImpl) Register(ctx context.Context, req model.UserRegisterReq) error {
+	if req.Password != req.CheckPassword {
+		logs.Error("password not same", ErrNotSamePassword)
+		return ErrNotSamePassword
+	}
+	u.userRepo.Register(ctx, req)
+	return nil
 }

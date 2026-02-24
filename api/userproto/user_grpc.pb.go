@@ -21,6 +21,8 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	UserService_UserLogin_FullMethodName    = "/UserService/UserLogin"
 	UserService_UserRegister_FullMethodName = "/UserService/UserRegister"
+	UserService_TokenValid_FullMethodName   = "/UserService/TokenValid"
+	UserService_TokenTest_FullMethodName    = "/UserService/TokenTest"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -29,6 +31,8 @@ const (
 type UserServiceClient interface {
 	UserLogin(ctx context.Context, in *UserLoginReq, opts ...grpc.CallOption) (*UserLoginResp, error)
 	UserRegister(ctx context.Context, in *UserRegisterReq, opts ...grpc.CallOption) (*UserRegisterResp, error)
+	TokenValid(ctx context.Context, in *TokenValidRequest, opts ...grpc.CallOption) (*TokenValidResponse, error)
+	TokenTest(ctx context.Context, in *TokenTestRequest, opts ...grpc.CallOption) (*TokenTestResponse, error)
 }
 
 type userServiceClient struct {
@@ -59,12 +63,34 @@ func (c *userServiceClient) UserRegister(ctx context.Context, in *UserRegisterRe
 	return out, nil
 }
 
+func (c *userServiceClient) TokenValid(ctx context.Context, in *TokenValidRequest, opts ...grpc.CallOption) (*TokenValidResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TokenValidResponse)
+	err := c.cc.Invoke(ctx, UserService_TokenValid_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) TokenTest(ctx context.Context, in *TokenTestRequest, opts ...grpc.CallOption) (*TokenTestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TokenTestResponse)
+	err := c.cc.Invoke(ctx, UserService_TokenTest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
 type UserServiceServer interface {
 	UserLogin(context.Context, *UserLoginReq) (*UserLoginResp, error)
 	UserRegister(context.Context, *UserRegisterReq) (*UserRegisterResp, error)
+	TokenValid(context.Context, *TokenValidRequest) (*TokenValidResponse, error)
+	TokenTest(context.Context, *TokenTestRequest) (*TokenTestResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -80,6 +106,12 @@ func (UnimplementedUserServiceServer) UserLogin(context.Context, *UserLoginReq) 
 }
 func (UnimplementedUserServiceServer) UserRegister(context.Context, *UserRegisterReq) (*UserRegisterResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UserRegister not implemented")
+}
+func (UnimplementedUserServiceServer) TokenValid(context.Context, *TokenValidRequest) (*TokenValidResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TokenValid not implemented")
+}
+func (UnimplementedUserServiceServer) TokenTest(context.Context, *TokenTestRequest) (*TokenTestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TokenTest not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -138,6 +170,42 @@ func _UserService_UserRegister_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_TokenValid_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TokenValidRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).TokenValid(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_TokenValid_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).TokenValid(ctx, req.(*TokenValidRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_TokenTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TokenTestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).TokenTest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_TokenTest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).TokenTest(ctx, req.(*TokenTestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +220,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UserRegister",
 			Handler:    _UserService_UserRegister_Handler,
+		},
+		{
+			MethodName: "TokenValid",
+			Handler:    _UserService_TokenValid_Handler,
+		},
+		{
+			MethodName: "TokenTest",
+			Handler:    _UserService_TokenTest_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -10,7 +10,7 @@ func InitRouter(user *controller.UserController) *gin.Engine {
 	r.Group("user")
 	{
 		r.POST("login", user.Login)
-		r.POST("register")
+		r.POST("register", user.Register)
 	}
 	return r
 }
