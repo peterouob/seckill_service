@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/peterouob/seckill_service/api/userproto"
-	"github.com/peterouob/seckill_service/services/user-service/internal/domain"
+	"github.com/peterouob/seckill_service/services/user-service/pkg/model"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -21,7 +21,7 @@ func NewUserController(grpcClient userproto.UserServiceClient) *UserController {
 }
 
 func (u *UserController) Login(c *gin.Context) {
-	var loginReq domain.UserLoginReq
+	var loginReq model.UserLoginReq
 	if err := c.ShouldBindJSON(&loginReq); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return

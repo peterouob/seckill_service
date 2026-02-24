@@ -3,32 +3,32 @@ package repository
 import (
 	"context"
 
-	"github.com/peterouob/seckill_service/services/user-service/internal/domain"
+	"github.com/peterouob/seckill_service/services/user-service/pkg/model"
 	"gorm.io/gorm"
 )
 
 type UserRepo interface {
-	GetUserByName(context.Context, domain.UserLoginReq) (*domain.User, error)
-	Register(context.Context, domain.UserRegisterReq)
+	GetUserByName(context.Context, model.UserLoginReq) (*model.User, error)
+	Register(context.Context, model.UserRegisterReq)
 }
 
-type UserRepoImpl struct {
+type userRepoImpl struct {
 	db *gorm.DB
 }
 
-func (u *UserRepoImpl) Register(ctx context.Context, req domain.UserRegisterReq) {
+func (u *userRepoImpl) Register(ctx context.Context, req model.UserRegisterReq) {
 	//TODO implement me
 	panic("implement me")
 }
 
-var _ (UserRepo) = (*UserRepoImpl)(nil)
+var _ (UserRepo) = (*userRepoImpl)(nil)
 
-func NewUserRepo(db *gorm.DB) *UserRepoImpl {
-	return &UserRepoImpl{
+func NewUserRepo(db *gorm.DB) UserRepo {
+	return &userRepoImpl{
 		db: db,
 	}
 }
 
-func (u *UserRepoImpl) GetUserByName(ctx context.Context, user domain.UserLoginReq) (*domain.User, error) {
+func (u *userRepoImpl) GetUserByName(ctx context.Context, user model.UserLoginReq) (*model.User, error) {
 	return nil, nil
 }

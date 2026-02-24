@@ -3,24 +3,29 @@ package service
 import (
 	"context"
 
-	"github.com/peterouob/seckill_service/services/user-service/internal/domain"
 	"github.com/peterouob/seckill_service/services/user-service/internal/infrastructure/repository"
+	"github.com/peterouob/seckill_service/services/user-service/pkg/model"
 )
 
 type UserService interface {
-	Login(context.Context, domain.UserLoginReq)
+	Login(context.Context, model.UserLoginReq)
+	Register(context.Context, model.UserRegisterReq)
 }
 
-type UserServiceImpl struct {
+type userServiceImpl struct {
 	userRepo repository.UserRepo
 }
 
-func NewUserService(userRepo repository.UserRepo) *UserServiceImpl {
-	return &UserServiceImpl{
+func NewUserService(userRepo repository.UserRepo) UserService {
+	return &userServiceImpl{
 		userRepo: userRepo,
 	}
 }
 
-func (u *UserServiceImpl) Login(ctx context.Context, req domain.UserLoginReq) {
+func (u *userServiceImpl) Login(ctx context.Context, req model.UserLoginReq) {
+
+}
+
+func (u *userServiceImpl) Register(ctx context.Context, req model.UserRegisterReq) {
 
 }
