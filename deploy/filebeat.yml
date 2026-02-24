@@ -3,16 +3,35 @@ filebeat.inputs:
   id: app-logs
   enable: true
   paths:
-  - /usr/share/filebeat/logs/*.log
+    - /usr/share/filebeat/logs/*.log
+  ignore_older: 72h
   parsers:
-  - ndjson:
-      target: ""
-      add_error_key: true
-  fields:
-    service: "logs"
-  fields_under_root: true
+    - ndjson:
+        target: ""
+        add_error_key: true
+        message_key: msg
+  prospector.scanner.check_interval: 1s
 
 processors:
+  - add_fields:
+      target: ''
+      fields:
+        service: 'app'
+  - script:
+      lang: javascript
+      id: extract_service
+      source: >
+        function process(event) {
+            var path = event.Get("log.file.path");
+            if (path) {
+                var parts = path.split('/');
+                var filename = parts[parts.length - 1];
+                var match = filename.match(/log-(.+)-\d{4}-\d{2}-\d{2}\.log/);
+                if (match && match[1]) {
+                    event.Put("service", match[1]);
+                }
+            }
+        }
   - drop_fields:
       fields: ["agent.ephemeral_id","agent.hostname","agent.type","agent.version", "ecs", "log.offset", "host"]
 

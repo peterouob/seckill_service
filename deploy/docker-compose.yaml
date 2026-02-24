@@ -38,7 +38,7 @@ services:
   db:
     image: postgres:latest
     environment:
-      POSTGRES_USER: root
+      POSTGRES_USER: pgroot
       POSTGRES_PASSWORD: password
       POSTGRES_DB: seckill
     ports:
@@ -99,7 +99,7 @@ services:
     container_name: filebeat
     user: root
     volumes:
-      - ./filebeat.yaml:/usr/share/filebeat/filebeat.yml:ro
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - ../app_logs:/usr/share/filebeat/logs:ro
     networks:
       - my_bridge
