@@ -16,6 +16,7 @@ import (
 	"github.com/peterouob/seckill_service/services/user-service/internal/router"
 	"github.com/peterouob/seckill_service/services/user-service/internal/service"
 	"github.com/peterouob/seckill_service/utils/database"
+	etcdregister "github.com/peterouob/seckill_service/utils/etcd"
 	"github.com/peterouob/seckill_service/utils/logs"
 	"github.com/peterouob/seckill_service/utils/pool"
 	"google.golang.org/grpc"
@@ -31,6 +32,7 @@ func main() {
 	grpcChannel := make(chan struct{})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
+
 	go func() {
 		lis, err := net.Listen("tcp", ":50050")
 		if err != nil {
@@ -64,6 +66,9 @@ func main() {
 		Addr:    ":8083",
 		Handler: r,
 	}
+
+	etcd := etcdregister.NewEtcdRegister([]string{"127.0.0.1:2379"}, 3)
+	etcd.Register("user", "127.0.0.1:8083")
 
 	serverErrors := make(chan error, 1)
 	go func() {
