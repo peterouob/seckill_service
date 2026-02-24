@@ -1,14 +1,14 @@
 package mq
 
 import (
-	"context"
+	"encoding/json"
 	"log"
-	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/IBM/sarama"
+	"github.com/peterouob/seckill_service/services/seckill-service/pkg/model"
+	"github.com/peterouob/seckill_service/utils/logs"
+	"gorm.io/gorm"
 )
 
 type ConsumeHandler interface {
@@ -18,56 +18,39 @@ type ConsumeHandler interface {
 }
 
 type ConsumerGroup struct {
-	ready       chan bool
-	message     chan *sarama.ConsumerMessage
-	batchSize   int
-	flushTime   time.Duration
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
-	mu          sync.Mutex
-	batchBuffer []*sarama.ConsumerMessage
-	lastCommit  time.Time
-	rdb         *redis.Client
+	batchSize int
+	flushTime time.Duration
+	db        *gorm.DB
+	ready     chan bool
 }
 
 var _ ConsumeHandler = (*ConsumerGroup)(nil)
 
 func (l *ConsumerGroup) Setup(session sarama.ConsumerGroupSession) error {
 	log.Printf("Consumer group session setup for member: %s\n", session.MemberID())
-	close(l.ready)
-	l.wg.Add(1)
-	go l.processBatches(session)
 	return nil
 }
 
 func (l *ConsumerGroup) Cleanup(session sarama.ConsumerGroupSession) error {
 	log.Println("Consumer group session cleanup for member: ", session.MemberID())
-	l.cancel()
-	l.wg.Wait()
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if len(l.batchBuffer) > 0 {
-		log.Println("Processing remaining messages in buffer during cleanup...")
-		l.commit(session, l.batchBuffer)
-		l.batchBuffer = nil
-	}
 	return nil
 }
 
 func (l *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-	batchSize := l.batchSize
-	batch := make([]*sarama.ConsumerMessage, 0, batchSize)
+	batch := make([]*sarama.ConsumerMessage, 0, l.batchSize)
 	ticker := time.NewTicker(l.flushTime)
 	defer ticker.Stop()
 	for {
 		select {
 		case msg, ok := <-claim.Messages():
 			if !ok {
+				if len(batch) != 0 {
+					l.commit(session, batch)
+				}
 				return nil
 			}
 			batch = append(batch, msg)
-			if len(batch) >= batchSize {
+			if len(batch) >= l.batchSize {
 				l.commit(session, batch)
 				batch = batch[:0]
 			}
@@ -85,63 +68,12 @@ func (l *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 	}
 }
 
-func NewLikeHandler(batchSize int, flushTime time.Duration) *ConsumerGroup {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewSeckillHandler(batchSize int, flushTime time.Duration, db *gorm.DB) *ConsumerGroup {
 	return &ConsumerGroup{
-		ready:      make(chan bool),
-		message:    make(chan *sarama.ConsumerMessage, 10000),
-		batchSize:  batchSize,
-		flushTime:  flushTime,
-		ctx:        ctx,
-		cancel:     cancel,
-		lastCommit: time.Now(),
-	}
-}
-
-func (l *ConsumerGroup) processBatches(session sarama.ConsumerGroupSession) {
-	defer l.wg.Done()
-	ticker := time.NewTicker(l.flushTime)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case msg := <-l.message:
-
-			var curBatch []*sarama.ConsumerMessage
-			l.mu.Lock()
-			l.batchBuffer = append(l.batchBuffer, msg)
-
-			if len(l.batchBuffer) >= l.batchSize {
-				log.Printf("Batch size reached (%d), processing batch.\n", len(l.batchBuffer))
-				curBatch = l.batchBuffer
-				l.batchBuffer = nil
-				l.lastCommit = time.Now()
-			}
-			l.mu.Unlock()
-
-			if curBatch != nil {
-				l.commit(session, curBatch)
-			}
-		case <-ticker.C:
-			var curBatch []*sarama.ConsumerMessage
-			l.mu.Lock()
-			if len(l.batchBuffer) > 0 && time.Since(l.lastCommit) >= l.flushTime {
-				log.Printf("Batch interval reached, processing batch (%d messages).\n", len(l.batchBuffer))
-				curBatch = l.batchBuffer
-				l.batchBuffer = nil
-				l.lastCommit = time.Now()
-			}
-			l.mu.Unlock()
-			if curBatch != nil {
-				l.commit(session, curBatch)
-			}
-		case <-l.ctx.Done():
-			log.Println("Batch processing goroutine shutting down.")
-			return
-		case <-session.Context().Done():
-			log.Println("Session context cancelled, batch processing goroutine shutting down.")
-			return
-		}
+		batchSize: batchSize,
+		flushTime: flushTime,
+		db:        db,
+		ready:     make(chan bool, 1),
 	}
 }
 
@@ -158,8 +90,22 @@ func (l *ConsumerGroup) commit(session sarama.ConsumerGroupSession, batch []*sar
 	//if errors.Is(model.ErrPipe, model.RunScript(l.ctx, counts)) {
 	//	log.Println("error in run script")
 	//}
+	var order model.Order
+	for _, topic := range batch {
+		if err := json.Unmarshal(topic.Value, &order); err != nil {
+			logs.Error("error to unmarshal json order", err)
+		}
+	}
+
+	log.Println(order)
+
+	if err := l.db.Create(&order).Error; err != nil {
+		logs.Error("error to create order", err)
+	}
+
 	for _, msg := range batch {
 		session.MarkMessage(msg, "")
 	}
+
 	session.Commit()
 }

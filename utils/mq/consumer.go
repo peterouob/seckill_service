@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
+	"gorm.io/gorm"
 )
 
 type Consumer struct {
@@ -27,7 +28,7 @@ type Consumer struct {
 	sync.Mutex
 }
 
-func NewConsumer(groupId string, topic []string, batchSize int, flushTime time.Duration) *Consumer {
+func NewConsumer(groupId string, topic []string, batchSize int, flushTime time.Duration, db *gorm.DB) *Consumer {
 	conf := sarama.NewConfig()
 	conf.Consumer.Fetch.Default = 1024 * 1024
 	conf.Consumer.MaxWaitTime = 500 * time.Millisecond
@@ -50,7 +51,7 @@ func NewConsumer(groupId string, topic []string, batchSize int, flushTime time.D
 		flushTime: flushTime,
 		ctx:       ctx,
 		cancel:    cancel,
-		handler:   NewLikeHandler(batchSize, flushTime),
+		handler:   NewSeckillHandler(batchSize, flushTime, db),
 		//backoffCfg: configs.NewBackOffConfig(true),
 		//random:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}

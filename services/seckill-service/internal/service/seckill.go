@@ -3,8 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/peterouob/seckill_service/services/seckill-service/internal/infrastructure/repository"
+	"github.com/peterouob/seckill_service/services/seckill-service/pkg/model"
+	"github.com/peterouob/seckill_service/utils/mq"
 )
 
 type SeckillService interface {
@@ -13,11 +16,13 @@ type SeckillService interface {
 
 type seckillServiceImpl struct {
 	repo repository.SeckillRepo
+	pd   *mq.Producer
 }
 
-func NewSeckillService(repo repository.SeckillRepo) SeckillService {
+func NewSeckillService(repo repository.SeckillRepo, pd *mq.Producer) SeckillService {
 	return &seckillServiceImpl{
 		repo: repo,
+		pd:   pd,
 	}
 }
 
@@ -30,6 +35,12 @@ func (s *seckillServiceImpl) Buy(ctx context.Context, userId, productId string) 
 	switch result {
 	case 1:
 		// TODO: kafka async write in db
+		order := model.Order{
+			UserId:    userId,
+			ProductId: productId,
+			CreateAt:  time.Now(),
+		}
+		s.pd.Send("order", order)
 		return nil
 	case 2:
 		return errors.New("您已經搶購過此商品了")

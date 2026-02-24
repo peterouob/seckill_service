@@ -14,16 +14,24 @@ import (
 	"github.com/peterouob/seckill_service/services/seckill-service/internal/service"
 	"github.com/peterouob/seckill_service/utils/database"
 	"github.com/peterouob/seckill_service/utils/logs"
+	"github.com/peterouob/seckill_service/utils/mq"
 )
 
 func main() {
 	logs.InitLogger("seckill")
-	//db := database.ConnPostgresql()
+	db := database.ConnPostgresql()
+	produce := mq.NewProducer()
+	defer produce.Close()
 	rdb := database.ConnRedis()
-
 	repo := repository.NewSeckillRepo(rdb)
-	srv := service.NewSeckillService(repo)
+	srv := service.NewSeckillService(repo, produce)
 	ctl := controller.NewSeckillController(srv)
+
+	consumer := mq.NewConsumer("seckill", []string{"order"}, 1000, 1*time.Second, db)
+
+	go func() {
+		consumer.StartConsume()
+	}()
 
 	r := router.InitRouter(ctl)
 

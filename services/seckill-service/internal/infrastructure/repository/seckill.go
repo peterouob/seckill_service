@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -51,7 +50,6 @@ func (r *seckillRepoImpl) DeductStock(ctx context.Context, productID string, use
 
 	keys := []string{stockKey, usersKey}
 
-	log.Println(stockKey, usersKey, keys)
 	result, err := seckillScript.Run(ctx, r.redisClient, keys, userID).Result()
 	if err != nil {
 		return 0, fmt.Errorf("redis腳本執行失敗: %v", err)
