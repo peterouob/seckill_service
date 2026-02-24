@@ -34,7 +34,6 @@ func (s *seckillServiceImpl) Buy(ctx context.Context, userId, productId string) 
 
 	switch result {
 	case 1:
-		// TODO: kafka async write in db
 		order := model.Order{
 			UserId:    userId,
 			ProductId: productId,

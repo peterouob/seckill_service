@@ -20,11 +20,6 @@ type userRepoImpl struct {
 	db *gorm.DB
 }
 
-func (u *userRepoImpl) Login(ctx context.Context, username string, password string) (*model.User, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 var _ (UserRepo) = (*userRepoImpl)(nil)
 
 func NewUserRepo(db *gorm.DB) UserRepo {
@@ -33,7 +28,7 @@ func NewUserRepo(db *gorm.DB) UserRepo {
 	}
 }
 
-func (u *userRepoImpl) GetUserByName(ctx context.Context, username string) (*model.User, error) {
+func (u *userRepoImpl) GetUserByName(_ context.Context, username string) (*model.User, error) {
 	var user model.User
 	if err := u.db.Where("username = ?", username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -55,4 +50,20 @@ func (u *userRepoImpl) Register(ctx context.Context, req model.UserRegisterReq) 
 			logs.Error("create user error", err)
 		}
 	}
+}
+
+func (u *userRepoImpl) Login(ctx context.Context, username string, password string) (*model.User, error) {
+	user, err := u.GetUserByName(ctx, username)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, err
+	}
+
+	if user.Password != password {
+		return nil, errors.New("password error")
+	}
+
+	return user, nil
 }

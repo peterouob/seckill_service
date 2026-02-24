@@ -2,7 +2,6 @@ package verify
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -14,35 +13,24 @@ import (
 )
 
 var (
-	err        error
-	TokenKey   atomic.Value
-	RefreshKey atomic.Value
+	err      error
+	TokenKey atomic.Value
 )
 
-type TokenInterface interface {
-	CreateToken()
-	CreateRefreshToken()
-}
-
 type Token struct {
-	UserId       int64         `json:"user_id"`
-	AccessId     string        `json:"access_id"`
-	AccessToken  string        `json:"access_token"`
-	RefreshId    string        `json:"refresh_id"`
-	RefreshToken string        `json:"refresh_token"`
-	Token        configs.Token `json:"token"`
+	UserId      int64         `json:"user_id"`
+	AccessId    string        `json:"access_id"`
+	AccessToken string        `json:"access_token"`
+	Token       configs.Token `json:"token"`
 }
 
-var _ TokenInterface = (*Token)(nil)
+var tokenKey = "thisistokenkey"
 
 func NewToken(id int64) *Token {
-	TokenKey.Store(configs.Config.GetString("token.token_key"))
-	RefreshKey.Store(configs.Config.GetString("token.refresh_key"))
+	TokenKey.Store(tokenKey)
 	token := &configs.Token{}
 	token.AccessUuid = uuid.NewString()
-	token.RefreshUuid = uuid.NewString()
 	token.AtExpires = time.Now().Add(time.Hour * 2).Unix()
-	token.RefreshAtExpires = time.Now().Add(time.Hour * 24 * 7 * 2).Unix()
 	return &Token{
 		UserId: id,
 		Token:  *token,
@@ -65,23 +53,10 @@ func (t *Token) CreateToken() {
 	t.AccessId = claims["access_id"].(string)
 }
 
-func (t *Token) CreateRefreshToken() {
-	claims := jwt.MapClaims{
-		"refresh_id": t.Token.RefreshUuid,
-		"exp":        t.Token.RefreshAtExpires,
-		"type":       "refresh",
-		"userId":     t.UserId,
-		"jti":        t.UserId,
-		"iat":        time.Now().Unix(),
-	}
-	tk := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	t.RefreshToken = string(fmt.Appendf(tk.Signature, fmt.Sprintf("%s%d", RefreshKey.Load().(string), t.UserId)))
-
-	logs.HandelError("create refresh token error", err)
-	t.RefreshId = claims["refresh_id"].(string)
-}
-
 func TokenVerify(tokenString string) *jwt.Token {
+	if TokenKey.Load() == nil {
+		TokenKey.Store(tokenKey)
+	}
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			logs.HandelError("parse token error type", err)

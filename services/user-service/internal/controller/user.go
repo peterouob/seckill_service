@@ -43,7 +43,10 @@ func (u *UserController) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"msg": resp})
+	c.JSON(200, gin.H{
+		"msg":   resp.Msg,
+		"token": resp.Token,
+	})
 }
 
 func (u *UserController) Register(c *gin.Context) {

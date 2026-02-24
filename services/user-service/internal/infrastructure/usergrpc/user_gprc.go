@@ -24,9 +24,13 @@ func (u *UserGrpcHandler) UserLogin(ctx context.Context, in *userproto.UserLogin
 		Username: in.GetUsername(),
 		Password: in.GetPassword(),
 	}
-	u.userService.Login(ctx, user)
+	token, err := u.userService.Login(ctx, user)
+	if err != nil {
+		return nil, err
+	}
 	return &userproto.UserLoginResp{
-		Msg: "success",
+		Msg:   "success",
+		Token: token,
 	}, nil
 }
 
