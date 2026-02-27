@@ -15,6 +15,7 @@ import (
 	"github.com/peterouob/seckill_service/services/user-service/internal/infrastructure/usergrpc"
 	"github.com/peterouob/seckill_service/services/user-service/internal/router"
 	"github.com/peterouob/seckill_service/services/user-service/internal/service"
+	"github.com/peterouob/seckill_service/utils"
 	"github.com/peterouob/seckill_service/utils/database"
 	etcdregister "github.com/peterouob/seckill_service/utils/etcd"
 	"github.com/peterouob/seckill_service/utils/logs"
@@ -24,7 +25,7 @@ import (
 
 func main() {
 	logs.InitLogger("user")
-	db := database.ConnPostgresql()
+	db := database.ConnMysql()
 	userRepo := repository.NewUserRepo(db)
 	userService := service.NewUserService(userRepo)
 	userGrpc := usergrpc.NewUserGrpcHandlers(userService)
@@ -33,8 +34,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
+	grpcAddr := utils.FormatIP(":50050")
+
 	go func() {
-		lis, err := net.Listen("tcp", ":50050")
+		lis, err := net.Listen("tcp", grpcAddr)
 		if err != nil {
 			logs.Error("failed to listen: %v\n", err)
 		}
@@ -55,8 +58,9 @@ func main() {
 
 	}
 
-	p := pool.New("127.0.0.1:50050", pool.DefaultOption)
+	p := pool.New(grpcAddr, pool.DefaultOption)
 	conn, _ := p.Get()
+	defer p.Put(conn)
 	client := userproto.NewUserServiceClient(conn.Value())
 	userController := controller.NewUserController(client)
 
@@ -67,8 +71,9 @@ func main() {
 		Handler: r,
 	}
 
+	etcdServiceName := "user"
 	etcd := etcdregister.NewEtcdRegister([]string{"127.0.0.1:2379"}, 3)
-	etcd.Register("user", "127.0.0.1:8083")
+	etcd.Register(etcdServiceName, grpcAddr)
 
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -83,11 +88,12 @@ func main() {
 		logs.Logf("Error starting server ... %v\n", err)
 	case sig := <-shutDown:
 		logs.ErrorMsgF("Server is shutting due to the %v signal\n", sig)
+		etcd.UnRegister(etcdServiceName, grpcAddr)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			logs.ErrorMsgF("Could n ot stdio the server gracefully %v\n", err)
+			logs.ErrorMsgF("Could not shutdown the server gracefully %v\n", err)
 			_ = server.Close()
 		}
 	}
