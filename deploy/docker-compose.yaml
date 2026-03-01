@@ -36,13 +36,13 @@ services:
     depends_on:
       - kafka
   db:
-    image: postgres:latest
+    image: mysql:8.4
+    container_name: mysql
     environment:
-      POSTGRES_USER: pgroot
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: seckill
+      MYSQL_ROOT_PASSWORD: "password"
+      MYSQL_DATABASE: "seckill"
     ports:
-      - "5431:5432"
+      - "3307:3306"
     networks:
       - my_bridge
   redis:
@@ -107,7 +107,50 @@ services:
       - elastic
       - kafka
     command: filebeat -e -strict.perms=false
-
+  etcd:
+    image: gcr.io/etcd-development/etcd:v3.5.0
+    restart: always
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd
+      - --advertise-client-urls=http://etcd:2379
+      - -listen-client-urls=http://0.0.0.0:2379
+      - -initial-advertise-peer-urls=http://etcd:2380
+      - -listen-peer-urls=http://0.0.0.0:2380
+      - -initial-cluster-token=etcd-cluster-token
+      - -initial-cluster=etcd=http://etcd:2380
+      - -initial-cluster-state=new
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+#    volumes:
+#      - etcd_data:/bitnami/etcd
+    healthcheck:
+      test: [ "CMD", "etcdctl", "get", "health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - my_bridge
+  user-service:
+    build:
+      context: ../
+      dockerfile: services/user-service/Dockerfile
+    container_name: user-service
+    ports:
+      - "8083:8083"
+      - "50050:50050"
+    environment:
+      - SERVICE_IP=user-service
+      - DB_DSN=root:password@tcp(db:3306)/seckill?charset=utf8mb4&parseTime=True&loc=Local
+      - REDIS_ADDR=redis:6379
+      - ETCD_ENDPOINTS=etcd:2379
+    networks:
+      - my_bridge
+    depends_on:
+      - etcd
+      - db
+      - redis
 networks:
   my_bridge:
     driver: bridge

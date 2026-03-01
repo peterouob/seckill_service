@@ -49,20 +49,23 @@ func RegisterETCD(etcdServers []string, heartbeat int64) *EtcdService {
 }
 
 func (s *EtcdService) Register(service string, endpoint string, leaseID clientv3.LeaseID) clientv3.LeaseID {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	var currentId clientv3.LeaseID
 	if leaseID <= 0 {
 		lease, err := s.client.Grant(ctx, s.heartbeat)
 		logs.HandelError("grant lease error", err)
+		currentId = lease.ID
 		key := fmt.Sprintf("%s/%s/%s",
 			strings.TrimRight("/service/grpc", "/"),
 			service,
 			endpoint)
 
-		_, err = s.client.Put(ctx, key, "", clientv3.WithLease(leaseID))
+		_, err = s.client.Put(ctx, key, "", clientv3.WithLease(currentId))
 		logs.HandelError(fmt.Sprintf("puth in %s node %s on etcd error", service, endpoint), err)
-		return lease.ID
+		return currentId
 	}
-	keepAlive, err := s.client.KeepAlive(ctx, leaseID)
+	keepAlive, err := s.client.KeepAlive(context.Background(), leaseID)
 
 	if err != nil {
 		logs.Error("error to keep etcd alive", err)
