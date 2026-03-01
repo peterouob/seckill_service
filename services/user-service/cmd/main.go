@@ -9,12 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/peterouob/seckill_service/api/userproto"
 	"github.com/peterouob/seckill_service/services/user-service/internal/controller"
 	"github.com/peterouob/seckill_service/services/user-service/internal/infrastructure/repository"
 	"github.com/peterouob/seckill_service/services/user-service/internal/infrastructure/usergrpc"
 	"github.com/peterouob/seckill_service/services/user-service/internal/router"
 	"github.com/peterouob/seckill_service/services/user-service/internal/service"
+	"github.com/peterouob/seckill_service/services/user-service/pkg/model"
 	"github.com/peterouob/seckill_service/utils"
 	"github.com/peterouob/seckill_service/utils/database"
 	etcdregister "github.com/peterouob/seckill_service/utils/etcd"
@@ -24,8 +26,14 @@ import (
 )
 
 func main() {
+	if err := godotenv.Load(".env"); err != nil {
+		logs.Error("Error loading .env file", err)
+	}
 	logs.InitLogger("user")
-	db := database.ConnMysql()
+	db := database.ConnMysql(os.Getenv("DB_DSN"))
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		logs.Error("error in auto migrate user model", err)
+	}
 	userRepo := repository.NewUserRepo(db)
 	userService := service.NewUserService(userRepo)
 	userGrpc := usergrpc.NewUserGrpcHandlers(userService)
@@ -34,7 +42,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	grpcAddr := utils.FormatIP(":50050")
+	grpcAddr := utils.FormatIP("50050")
 
 	go func() {
 		lis, err := net.Listen("tcp", grpcAddr)
@@ -55,7 +63,6 @@ func main() {
 		logs.Log("grpc server ready ...")
 	case <-ctx.Done():
 		logs.Warn("grpc server start timeout")
-
 	}
 
 	p := pool.New(grpcAddr, pool.DefaultOption)
@@ -72,7 +79,7 @@ func main() {
 	}
 
 	etcdServiceName := "user"
-	etcd := etcdregister.NewEtcdRegister([]string{"127.0.0.1:2379"}, 3)
+	etcd := etcdregister.NewEtcdRegister([]string{os.Getenv("ETCD_ENDPOINTS")}, 3)
 	etcd.Register(etcdServiceName, grpcAddr)
 
 	serverErrors := make(chan error, 1)
