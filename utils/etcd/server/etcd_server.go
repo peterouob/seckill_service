@@ -105,3 +105,7 @@ func (s *EtcdService) UnRegister(service string, endpoint string) {
 	logs.HandelError("delete etcd node error", err)
 	logs.Log(fmt.Sprintf("unregistered %s node %s from etcd", service, endpoint))
 }
+
+func (s *EtcdService) Client() *clientv3.Client {
+	return s.client
+}

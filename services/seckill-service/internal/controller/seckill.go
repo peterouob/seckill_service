@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,11 +10,13 @@ import (
 )
 
 type SeckillController struct {
+	ctx            context.Context
 	seckillService service.SeckillService
 }
 
-func NewSeckillController(svc service.SeckillService) *SeckillController {
+func NewSeckillController(ctx context.Context, svc service.SeckillService) *SeckillController {
 	return &SeckillController{
+		ctx:            ctx,
 		seckillService: svc,
 	}
 }
@@ -26,7 +29,7 @@ func (ctl *SeckillController) Buy(c *gin.Context) {
 		return
 	}
 
-	err := ctl.seckillService.Buy(c.Request.Context(), seckillReq.UserID, seckillReq.ProductID)
+	err := ctl.seckillService.Buy(ctl.ctx, seckillReq.UserID, seckillReq.ProductID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

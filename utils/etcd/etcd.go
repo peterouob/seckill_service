@@ -9,7 +9,7 @@ import (
 )
 
 type EtcdRegister struct {
-	client  *server.EtcdService
+	Client  *server.EtcdService
 	leaseId clientv3.LeaseID
 	heart   int64
 }
@@ -17,23 +17,23 @@ type EtcdRegister struct {
 func NewEtcdRegister(endpoints []string, heart int64) *EtcdRegister {
 	c := server.RegisterETCD(endpoints, heart)
 	e := &EtcdRegister{
-		client: c,
+		Client: c,
 		heart:  heart,
 	}
 	return e
 }
 
 func (e *EtcdRegister) Register(serviceName, value string) {
-	e.leaseId = e.client.Register(serviceName, value, 0)
+	e.leaseId = e.Client.Register(serviceName, value, 0)
 	//tools.Log(fmt.Sprintf("Registered service %s at %s", serviceName, addr))
 	go func() {
 		for {
-			e.client.Register(serviceName, value, e.leaseId)
+			e.Client.Register(serviceName, value, e.leaseId)
 		}
 	}()
 }
 
 func (e *EtcdRegister) UnRegister(serviceName, addr string) {
-	e.client.UnRegister(serviceName, addr)
+	e.Client.UnRegister(serviceName, addr)
 	logs.Log(fmt.Sprintf("unregiter service: %s from etcd, addr: %s", serviceName, addr))
 }
