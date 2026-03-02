@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option go_package = "../seckillproto";
+
+message SeckillRequest {
+  string userId = 1;
+  string productId = 2;
+  string token = 3;
+}
+
+enum BuyState {
+  SUCCESS = 0;
+  FAILED = 1;
+  WAIT = 2;
+}
+
+message SeckillResponse {
+  BuyState buyState = 1;
+  string msg = 2;
+}
+
+service SeckillService {
+  rpc Seckill(SeckillRequest) returns (SeckillResponse) {};
+}
