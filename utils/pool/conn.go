@@ -8,7 +8,6 @@ import (
 
 type Conn interface {
 	Value() *grpc.ClientConn
-	Close() error
 }
 
 type conn struct {
@@ -22,14 +21,6 @@ var _ Conn = (*conn)(nil)
 
 func (c *conn) Value() *grpc.ClientConn {
 	return c.cc
-}
-
-func (c *conn) Close() error {
-	c.pool.decRef()
-	if c.once {
-		return c.reset()
-	}
-	return nil
 }
 
 func (c *conn) reset() error {

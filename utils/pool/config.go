@@ -14,17 +14,14 @@ import (
 const (
 	DialTimeout = 5 * time.Second
 
-	KeepAliveTime = time.Duration(10) * time.Second
+	KeepAliveTime    = 30 * time.Second
+	KeepAliveTimeout = 10 * time.Second
 
-	KeepAliveTimeout = time.Duration(3) * time.Second
+	InitialWindowSize     = 64 << 20
+	InitialConnWindowSize = 64 << 20
 
-	InitialWindowSize = 1 << 30
-
-	InitialConnWindowSize = 1 << 30
-
-	MaxSendMsgSize = 4 << 30
-
-	MaxRecvMsgSize = 4 << 30
+	MaxSendMsgSize = 4 << 20
+	MaxRecvMsgSize = 4 << 20
 )
 
 var MaxBackoffDelay = grpc.ConnectParams{
