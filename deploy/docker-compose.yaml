@@ -132,6 +132,14 @@ services:
       retries: 3
     networks:
       - my_bridge
+  etcd_client:
+    image: tzfun/etcd-workbench
+    ports:
+      - "8002:8002"
+    depends_on:
+      - etcd
+    networks:
+      - my_bridge
   user-service:
     build:
       context: ../
