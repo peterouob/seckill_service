@@ -1,107 +1,32 @@
 package main
 
 import (
-	"context"
-	"net"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/peterouob/seckill_service/api/userproto"
-	"github.com/peterouob/seckill_service/services/user-service/internal/controller"
-	"github.com/peterouob/seckill_service/services/user-service/internal/infrastructure/repository"
-	"github.com/peterouob/seckill_service/services/user-service/internal/infrastructure/usergrpc"
-	"github.com/peterouob/seckill_service/services/user-service/internal/router"
-	"github.com/peterouob/seckill_service/services/user-service/internal/service"
-	"github.com/peterouob/seckill_service/services/user-service/pkg/model"
-	"github.com/peterouob/seckill_service/utils"
-	"github.com/peterouob/seckill_service/utils/database"
-	etcdregister "github.com/peterouob/seckill_service/utils/etcd"
-	"github.com/peterouob/seckill_service/utils/logs"
-	"github.com/peterouob/seckill_service/utils/pool"
-	"google.golang.org/grpc"
+	"github.com/peterouob/seckill_service/services/user-service/pkg/module"
+	"github.com/peterouob/seckill_service/utils/injection"
+	"go.uber.org/fx"
 )
 
 func main() {
-	if err := godotenv.Load(".env"); err != nil {
-		logs.Error("Error loading .env file", err)
-	}
-	logs.InitLogger("user")
-	db := database.ConnMysql(os.Getenv("DB_DSN"))
-	if err := db.AutoMigrate(&model.User{}); err != nil {
-		logs.Error("error in auto migrate user model", err)
-	}
-	userRepo := repository.NewUserRepo(db)
-	userService := service.NewUserService(userRepo)
-	userGrpc := usergrpc.NewUserGrpcHandlers(userService)
+	_ = godotenv.Load()
+	app := fx.New(
+		fx.StopTimeout(30*time.Second),
+		fx.Provide(func() *injection.Config {
+			return injection.ProvideConfig(
+				"50051",
+				"8083",
+				"seckill-svc",
+			)
+		}),
+		injection.MySQLModule,
+		injection.RedisModule,
+		injection.EtcdModule,
+		injection.GrpcServerModule,
+		injection.HTTPServerModule,
 
-	grpcChannel := make(chan struct{})
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	grpcAddr := utils.FormatIP("50050")
-
-	go func() {
-		lis, err := net.Listen("tcp", grpcAddr)
-		if err != nil {
-			logs.Error("failed to listen: %v\n", err)
-		}
-		grpcServer := grpc.NewServer()
-		userproto.RegisterUserServiceServer(grpcServer, userGrpc)
-		logs.Log("gRPC server start on :50050")
-		close(grpcChannel)
-		if err := grpcServer.Serve(lis); err != nil {
-			logs.Error("start grpc server error", err)
-		}
-	}()
-
-	select {
-	case <-grpcChannel:
-		logs.Log("grpc server ready ...")
-	case <-ctx.Done():
-		logs.Warn("grpc server start timeout")
-	}
-
-	p := pool.New(grpcAddr, pool.DefaultOption)
-	conn, _ := p.Get()
-	defer p.Put(conn)
-	client := userproto.NewUserServiceClient(conn.Value())
-	userController := controller.NewUserController(client)
-
-	r := router.InitRouter(userController)
-
-	server := &http.Server{
-		Addr:    ":8083",
-		Handler: r,
-	}
-
-	etcdServiceName := "user"
-	etcd := etcdregister.NewEtcdRegister([]string{os.Getenv("ETCD_ENDPOINTS")}, 3)
-	etcd.Register(etcdServiceName, grpcAddr)
-
-	serverErrors := make(chan error, 1)
-	go func() {
-		logs.Log("Starting server ...")
-		serverErrors <- server.ListenAndServe()
-	}()
-
-	shutDown := make(chan os.Signal, 1)
-	signal.Notify(shutDown, os.Interrupt, syscall.SIGTERM)
-	select {
-	case err := <-serverErrors:
-		logs.Logf("Error starting server ... %v\n", err)
-	case sig := <-shutDown:
-		logs.ErrorMsgF("Server is shutting due to the %v signal\n", sig)
-		etcd.UnRegister(etcdServiceName, grpcAddr)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := server.Shutdown(ctx); err != nil {
-			logs.ErrorMsgF("Could not shutdown the server gracefully %v\n", err)
-			_ = server.Close()
-		}
-	}
+		module.UserModule,
+	)
+	app.Run()
 }

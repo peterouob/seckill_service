@@ -3,11 +3,12 @@ package service
 import (
 	"context"
 	"errors"
-	"time"
+	"fmt"
 
 	"github.com/peterouob/seckill_service/services/seckill-service/internal/infrastructure/repository"
-	"github.com/peterouob/seckill_service/services/seckill-service/pkg/model"
+	etcdregister "github.com/peterouob/seckill_service/utils/etcd"
 	"github.com/peterouob/seckill_service/utils/mq"
+	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 type SeckillService interface {
@@ -15,31 +16,35 @@ type SeckillService interface {
 }
 
 type seckillServiceImpl struct {
-	repo repository.SeckillRepo
-	pd   *mq.Producer
+	repo    repository.SeckillRepo
+	pd      *mq.Producer
+	etcd    *etcdregister.EtcdRegister
+	ctx     context.Context
+	session *concurrency.Session
 }
 
-func NewSeckillService(repo repository.SeckillRepo, pd *mq.Producer) SeckillService {
-	return &seckillServiceImpl{
-		repo: repo,
-		pd:   pd,
+func NewSeckillService(ctx context.Context, repo repository.SeckillRepo, pd *mq.Producer, etcd *etcdregister.EtcdRegister) SeckillService {
+	session, _ := concurrency.NewSession(etcd.Client.Client(), concurrency.WithTTL(5))
+	s := &seckillServiceImpl{
+		ctx:     ctx,
+		repo:    repo,
+		pd:      pd,
+		etcd:    etcd,
+		session: session,
 	}
+	return s
 }
 
 func (s *seckillServiceImpl) Buy(ctx context.Context, userId, productId string) error {
-	result, err := s.repo.DeductStock(ctx, productId, userId)
+	result, err := s.repo.DeductStock(productId, userId)
 	if err != nil {
 		return errors.New("error in Buy service")
 	}
 
+	orderId := fmt.Sprintf("%s_%s", userId, productId)
 	switch result {
 	case 1:
-		order := model.Order{
-			UserId:    userId,
-			ProductId: productId,
-			CreateAt:  time.Now(),
-		}
-		s.pd.Send("order", order)
+		s.reduceStock(ctx, userId, productId, orderId)
 		return nil
 	case 2:
 		return errors.New("您已經搶購過此商品了")
@@ -50,4 +55,22 @@ func (s *seckillServiceImpl) Buy(ctx context.Context, userId, productId string) 
 	default:
 		return errors.New("error")
 	}
+}
+
+// reduceStock TOOD:use etcd distributed lock make sure only one can reduce for the truth stock in mysql
+func (s *seckillServiceImpl) reduceStock(ctx context.Context, userId, productId, orderId string) error {
+
+	pLock := fmt.Sprintf("/seckill/locks/%s", productId)
+	mutex := concurrency.NewMutex(s.session, pLock)
+
+	if err := mutex.Lock(ctx); err != nil {
+		return fmt.Errorf("could not acquire lock for %s: %w", productId, err)
+	}
+	defer mutex.Unlock(ctx)
+
+	if err := s.repo.ReduceStock(productId); err != nil {
+		return errors.New("error in reduce stock service")
+	}
+
+	return nil
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -48,42 +49,53 @@ func RegisterETCD(etcdServers []string, heartbeat int64) *EtcdService {
 	return serviceHub
 }
 
-func (s *EtcdService) Register(service string, endpoint string, leaseID clientv3.LeaseID) clientv3.LeaseID {
+func (s *EtcdService) Register(service string, endpoint string, leaseID clientv3.LeaseID, expired chan<- struct{}) clientv3.LeaseID {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	var currentId clientv3.LeaseID
+
 	if leaseID <= 0 {
 		lease, err := s.client.Grant(ctx, s.heartbeat)
-		logs.HandelError("grant lease error", err)
-		currentId = lease.ID
+		if err != nil {
+			logs.HandelError("grant lease error", err)
+			return 0
+		}
+
 		key := fmt.Sprintf("%s/%s/%s",
 			strings.TrimRight("/service/grpc", "/"),
 			service,
-			endpoint)
-
-		_, err = s.client.Put(ctx, key, "", clientv3.WithLease(currentId))
-		logs.HandelError(fmt.Sprintf("puth in %s node %s on etcd error", service, endpoint), err)
-		return currentId
-	}
-	keepAlive, err := s.client.KeepAlive(context.Background(), leaseID)
-
-	if err != nil {
-		logs.Error("error to keep etcd alive", err)
-	}
-
-	go func() {
-		for keepResp := range keepAlive {
-			if keepResp == nil {
-				logs.Log("lease is unable")
-				return
-			}
+			endpoint,
+		)
+		_, err = s.client.Put(ctx, key, "", clientv3.WithLease(lease.ID))
+		if err != nil {
+			logs.HandelError("put lease error", err)
+			return 0
 		}
-	}()
+
+		go s.keepAlive(lease.ID, expired)
+		return lease.ID
+	}
 
 	return leaseID
 }
 
-func (s *EtcdService) UnRegister(service string, endpoint string) {
+func (s *EtcdService) keepAlive(leaseID clientv3.LeaseID, expired chan<- struct{}) {
+	keepAlive, err := s.client.KeepAlive(context.Background(), leaseID)
+	if err != nil {
+		logs.Error("start keepalive failed: %v", err)
+		expired <- struct{}{}
+		return
+	}
+
+	for keepResp := range keepAlive {
+		if keepResp == nil {
+			logs.Log("etcd lease expired or revoked")
+			expired <- struct{}{}
+			return
+		}
+	}
+}
+
+func (s *EtcdService) UnRegister(service string, endpoint string) error {
 	ctx := context.Background()
 	key := fmt.Sprintf("%s/%s/%s",
 		strings.TrimRight("/service/grpc", "/"),
@@ -91,17 +103,25 @@ func (s *EtcdService) UnRegister(service string, endpoint string) {
 		endpoint)
 	resp, err := s.client.Get(ctx, key)
 	if err != nil || len(resp.Kvs) == 0 {
-		logs.Log(fmt.Sprintf("Key %s not found in etcd", key))
-		return
+		return errors.New("etcd service unregister fail")
 	}
 
 	leaseID := clientv3.LeaseID(resp.Kvs[0].Lease)
 	logs.Log(fmt.Sprintf("Revoking lease %d for key %s", leaseID, key))
 
-	_, err = s.client.Revoke(ctx, leaseID)
-	logs.HandelError("revoke lease error", err)
+	if _, err := s.client.Revoke(ctx, leaseID); err != nil {
+		logs.HandelError("revoke lease error", err)
+		return err
+	}
 
-	_, err = s.client.Delete(ctx, key)
-	logs.HandelError("delete etcd node error", err)
+	if _, err = s.client.Delete(ctx, key); err != nil {
+		logs.HandelError("delete etcd node error", err)
+		return err
+	}
 	logs.Log(fmt.Sprintf("unregistered %s node %s from etcd", service, endpoint))
+	return nil
+}
+
+func (s *EtcdService) Client() *clientv3.Client {
+	return s.client
 }

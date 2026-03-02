@@ -6,8 +6,7 @@ import (
 	"github.com/peterouob/seckill_service/utils"
 )
 
-func InitRouter(user *controller.UserController) *gin.Engine {
-	r := gin.Default()
+func InitRouter(r *gin.Engine, user *controller.UserController) {
 	r.Use(utils.Cors())
 	r.POST("login", user.Login)
 	u := r.RouterGroup
@@ -15,6 +14,4 @@ func InitRouter(user *controller.UserController) *gin.Engine {
 		u.Use()
 		u.POST("register", user.Register)
 	}
-
-	return r
 }

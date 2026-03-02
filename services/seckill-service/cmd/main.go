@@ -8,25 +8,36 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/peterouob/seckill_service/services/seckill-service/internal/controller"
 	"github.com/peterouob/seckill_service/services/seckill-service/internal/infrastructure/repository"
 	"github.com/peterouob/seckill_service/services/seckill-service/internal/router"
 	"github.com/peterouob/seckill_service/services/seckill-service/internal/service"
 	"github.com/peterouob/seckill_service/utils/database"
+	etcdregister "github.com/peterouob/seckill_service/utils/etcd"
 	"github.com/peterouob/seckill_service/utils/logs"
 	"github.com/peterouob/seckill_service/utils/mq"
 )
 
 func main() {
+	_ = godotenv.Load()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	logs.InitLogger("seckill")
-	db := database.ConnPostgresql()
+	var DbDsn string
+	if DbDsn = os.Getenv("DB_DSB"); DbDsn == "" {
+		DbDsn = "root:123456@tcp(localhost:3306)/seckill?charset=utf8mb4&parseTime=True&loc=Local"
+	}
+	db := database.ConnMysql(DbDsn)
 	produce := mq.NewProducer()
 	defer produce.Close()
+	etcd := etcdregister.NewEtcdRegister([]string{"localhost:2379"}, 5*time.Second.Milliseconds())
 	rdb := database.ConnRedis()
-	repo := repository.NewSeckillRepo(rdb)
-	srv := service.NewSeckillService(repo, produce)
-	ctl := controller.NewSeckillController(srv)
+	repo := repository.NewSeckillRepo(ctx, rdb, db)
+	srv := service.NewSeckillService(ctx, repo, produce, etcd)
+	ctl := controller.NewSeckillController(ctx, srv)
 
+	// TODO: groupId use product ID instead
 	consumer := mq.NewConsumer("seckill", []string{"order"}, 1000, 1*time.Second, db)
 	defer consumer.Close()
 	go func() {
