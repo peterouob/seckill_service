@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -17,6 +18,7 @@ import (
 
 type Pool interface {
 	Get() (Conn, error)
+	Put(Conn) error
 	Close() error
 	Status() string
 }
@@ -30,21 +32,24 @@ type pool struct {
 	addr      string
 	closed    atomic.Int32
 	checkTime time.Duration
+	cancel    context.CancelFunc
 	sync.RWMutex
 }
 
 var _ Pool = (*pool)(nil)
 
 func New(addr string, opt Option) Pool {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	p := &pool{
 		opt:       opt,
 		conns:     make([]*conn, opt.MaxActive),
 		addr:      addr,
 		checkTime: time.Minute,
+		cancel:    cancel,
 	}
-	p.curr.Store(opt.MaxActive)
+	p.curr.Store(opt.MaxIdle)
 
-	for i := range make([]struct{}, opt.MaxActive) {
+	for i := range opt.MaxIdle {
 		c, err := opt.Dial(addr)
 		if err != nil {
 			panic(fmt.Sprintf("error in dial %s , %v", addr, err.Error()))
@@ -53,18 +58,17 @@ func New(addr string, opt Option) Pool {
 	}
 
 	logs.Logf("new pool success %v\n", p.Status())
-	p.checkHealthy()
+	p.checkHealthy(ctx)
 	return p
 }
 
 func (p *pool) Get() (Conn, error) {
 	cur := p.curr.Load()
-	p.incRef()
-	nextRef := p.curr.Load()
-
 	if cur == 0 {
 		return nil, errors.New("pool closed")
 	}
+	p.incRef()
+	nextRef := p.ref.Load()
 
 	if nextRef <= cur*p.opt.MaxConcurrentStreams {
 		next := p.index.Add(1) % uint32(cur)
@@ -95,7 +99,7 @@ func (p *pool) Get() (Conn, error) {
 
 		var err error
 		var i int
-		for i := range make([]struct{}, inc) {
+		for i = range make([]struct{}, inc) {
 			c, er := p.opt.Dial(p.addr)
 			if er != nil {
 				err = er
@@ -110,7 +114,6 @@ func (p *pool) Get() (Conn, error) {
 			p.curr.Load(), cur, inc, p.opt.MaxActive)
 		p.curr.Store(cur)
 		if err != nil {
-			p.Unlock()
 			return nil, err
 		}
 	}
@@ -132,6 +135,7 @@ func (p *pool) Put(c Conn) error {
 }
 
 func (p *pool) Close() error {
+	p.cancel()
 	p.index.Store(0)
 	p.curr.Store(0)
 	p.ref.Store(0)
@@ -155,20 +159,18 @@ func (p *pool) incRef() {
 
 func (p *pool) decRef() {
 	newRef := p.ref.Add(-1)
-	if newRef < 0 && p.closed.Load() == 0 {
+	if atomic.LoadInt32(&newRef) < 0 && p.closed.Load() == 0 {
 		panic(fmt.Sprint("ref overflow to negative"))
 	}
 
-	if newRef == 0 && p.curr.Load() > p.opt.MaxIdle {
+	if atomic.LoadInt32(&newRef) == 0 && p.curr.Load() > p.opt.MaxIdle {
 		if p.TryLock() {
 			defer p.Unlock()
-			if p.ref.Load() == 0 && p.curr.Load() > p.opt.MaxIdle {
-				log.Printf("shrink pool: %d ---> %d, decrement: %d, maxActive: %d\n",
-					p.curr.Load(), p.opt.MaxIdle, p.curr.Load()-p.opt.MaxIdle, p.opt.MaxActive)
+			log.Printf("shrink pool: %d ---> %d, decrement: %d, maxActive: %d\n",
+				p.curr.Load(), p.opt.MaxIdle, p.curr.Load()-p.opt.MaxIdle, p.opt.MaxActive)
 
-				p.delete(p.opt.MaxIdle)
-				p.curr.Store(p.opt.MaxIdle)
-			}
+			p.delete(p.opt.MaxIdle)
+			p.curr.Store(p.opt.MaxIdle)
 		}
 	}
 }
@@ -195,16 +197,16 @@ func (p *pool) wrapConn(cc *grpc.ClientConn, once bool) *conn {
 	return &conn{cc: cc, pool: p, once: once}
 }
 
-func (p *pool) checkHealthy() {
+func (p *pool) checkHealthy(ctx context.Context) {
 	go func() {
+		ticker := time.NewTicker(p.checkTime)
+		defer ticker.Stop()
 		for {
-			if p.closed.Load() == 1 {
-				return
-			}
-
 			select {
-			case <-time.After(p.checkTime):
+			case <-ticker.C:
 				p.reConnect()
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -233,9 +235,8 @@ func (p *pool) reConnect() {
 			p.Unlock()
 
 			if oldCC != nil {
-				_ = oldCC.Close()
+				_ = p.Put(oldCC)
 			}
 		}
 	}
-
 }
