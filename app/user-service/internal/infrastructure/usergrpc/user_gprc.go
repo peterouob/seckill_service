@@ -8,18 +8,18 @@ import (
 	"github.com/peterouob/seckill_service/app/user-service/pkg/model"
 )
 
-type UserGrpcHandler struct {
+type UserHandler struct {
 	userproto.UnimplementedUserServiceServer
 	userService service.UserService
 }
 
-func NewUserGrpcHandlers(srv service.UserService) *UserGrpcHandler {
-	return &UserGrpcHandler{
+func NewUserGrpcHandlers(srv service.UserService) *UserHandler {
+	return &UserHandler{
 		userService: srv,
 	}
 }
 
-func (u *UserGrpcHandler) UserLogin(ctx context.Context, in *userproto.UserLoginReq) (*userproto.UserLoginResp, error) {
+func (u *UserHandler) UserLogin(ctx context.Context, in *userproto.UserLoginReq) (*userproto.UserLoginResp, error) {
 	user := model.UserLoginReq{
 		Username: in.GetUsername(),
 		Password: in.GetPassword(),
@@ -34,7 +34,7 @@ func (u *UserGrpcHandler) UserLogin(ctx context.Context, in *userproto.UserLogin
 	}, nil
 }
 
-func (u *UserGrpcHandler) UserRegister(ctx context.Context, in *userproto.UserRegisterReq) (*userproto.UserRegisterResp, error) {
+func (u *UserHandler) UserRegister(ctx context.Context, in *userproto.UserRegisterReq) (*userproto.UserRegisterResp, error) {
 	user := model.UserRegisterReq{
 		Username:      in.GetUsername(),
 		Password:      in.GetPassword(),
