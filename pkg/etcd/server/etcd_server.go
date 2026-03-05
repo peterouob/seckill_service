@@ -65,7 +65,7 @@ func (s *EtcdService) Register(service string, endpoint string, leaseID clientv3
 			service,
 			endpoint,
 		)
-		_, err = s.client.Put(ctx, key, "", clientv3.WithLease(lease.ID))
+		_, err = s.client.Put(ctx, key, endpoint, clientv3.WithLease(lease.ID))
 		if err != nil {
 			logger.HandelError("put lease error", err)
 			return 0
