@@ -13,7 +13,6 @@ import (
 	grpcctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	grpcopentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/peterouob/seckill_service/pkg/logger"
-	"github.com/peterouob/seckill_service/pkg/netutil"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -49,10 +48,9 @@ func ProvideGrpcServer(lc fx.Lifecycle, p GrpcServerParams) (*grpc.Server, GrpcS
 	readyC := make(chan struct{})
 	serveErr := make(chan error, 1)
 
-	grpcAddr := netutil.FormatIP(p.Config.GrpcAddr)
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			lis, err := net.Listen("tcp", grpcAddr)
+			lis, err := net.Listen("tcp", p.Config.GrpcAddr)
 			if err != nil {
 				logger.Error("grpc listen failed", err)
 				return err
@@ -60,7 +58,7 @@ func ProvideGrpcServer(lc fx.Lifecycle, p GrpcServerParams) (*grpc.Server, GrpcS
 
 			healthSrv.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 			go func() {
-				logger.Logf("gRPC server listening on %s", grpcAddr)
+				logger.Logf("gRPC server listening on %s", p.Config.GrpcAddr)
 				close(readyC)
 				serveErr <- server.Serve(lis)
 			}()
@@ -119,10 +117,8 @@ func ProvideHTTPServer(lc fx.Lifecycle, p HTTPServerParams) *gin.Engine {
 		c.String(http.StatusOK, "ok")
 	})
 
-	httpAddr := netutil.FormatIP(p.Config.HttpAddr)
-
 	srv := &http.Server{
-		Addr:         httpAddr,
+		Addr:         p.Config.HttpAddr,
 		Handler:      server,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -133,7 +129,7 @@ func ProvideHTTPServer(lc fx.Lifecycle, p HTTPServerParams) *gin.Engine {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			go func() {
-				logger.Logf("HTTP server listening on %s", httpAddr)
+				logger.Logf("HTTP server listening on %s", p.Config.HttpAddr)
 				serverErrors <- srv.ListenAndServe()
 			}()
 			return nil
