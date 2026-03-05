@@ -1,30 +1,29 @@
 package main
 
 import (
-	"time"
-
 	"github.com/joho/godotenv"
-	"github.com/peterouob/seckill_service/app/user-service/pkg/module"
+	"github.com/peterouob/seckill_service/app/user-service/cmd/module"
+	"github.com/peterouob/seckill_service/pkg/cache"
+	"github.com/peterouob/seckill_service/pkg/database"
 	"github.com/peterouob/seckill_service/pkg/injection"
+	"github.com/peterouob/seckill_service/pkg/netutil"
 	"go.uber.org/fx"
 )
 
 func main() {
 	_ = godotenv.Load()
 	app := fx.New(
-		fx.StopTimeout(30*time.Second),
 		fx.Provide(func() *injection.Config {
 			return injection.ProvideConfig(
-				"50051",
+				netutil.FormatIP("50051"),
 				"8083",
-				"seckill-svc",
+				"user-svc",
 			)
 		}),
-		injection.MySQLModule,
-		injection.RedisModule,
+		database.MySQLModule,
+		cache.RedisModule,
 		injection.EtcdModule,
 		injection.GrpcServerModule,
-		injection.HTTPServerModule,
 
 		module.UserModule,
 	)
