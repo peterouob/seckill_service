@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/peterouob/seckill_service/pkg/injection"
+	"github.com/peterouob/seckill_service/pkg/config"
 	"github.com/peterouob/seckill_service/pkg/logger"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
@@ -25,7 +25,7 @@ func connRedis() *redis.Client {
 }
 
 var RedisModule = fx.Module("redis", fx.Provide(
-	func(lc fx.Lifecycle, cfg *injection.Config) *redis.Client {
+	func(lc fx.Lifecycle, cfg *config.Config) *redis.Client {
 		rdb := connRedis()
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
