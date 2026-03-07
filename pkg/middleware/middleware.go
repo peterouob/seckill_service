@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/peterouob/seckill_service/app/user-service/pkg/verify"
+	"github.com/peterouob/seckill_service/service/user-service/pkg/verify"
 )
 
 func Cors() func(c *gin.Context) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/peterouob/seckill_service/pkg/injection"
+	"github.com/peterouob/seckill_service/pkg/config"
 	"github.com/peterouob/seckill_service/pkg/logger"
 	"go.uber.org/fx"
 	"gorm.io/driver/mysql"
@@ -41,7 +41,7 @@ func runMigration(m MigrationParams) error {
 
 var MySQLModule = fx.Module("mysql",
 	fx.Provide(
-		func(lc fx.Lifecycle, cfg *injection.Config) *gorm.DB {
+		func(lc fx.Lifecycle, cfg *config.Config) *gorm.DB {
 			db := connMysql(cfg.DbDSN)
 			lc.Append(fx.Hook{
 				OnStop: func(ctx context.Context) error {

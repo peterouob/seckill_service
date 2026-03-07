@@ -1,19 +1,41 @@
 package kafka
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
 	"time"
 
 	"github.com/IBM/sarama"
+	"go.uber.org/fx"
 )
 
 type Producer struct {
 	sarama.AsyncProducer
 }
 
-func NewProducer() *Producer {
+var KafkaProducerModule = fx.Module("kafka-producer",
+	fx.Provide(
+		func(lc fx.Lifecycle) *Producer {
+			producer := &Producer{}
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					producer = newProducer()
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					if err := producer.Close(); err != nil {
+						return err
+					}
+					return nil
+				},
+			})
+			return producer
+		},
+	))
+
+func newProducer() *Producer {
 	conf := sarama.NewConfig()
 	conf.Producer.RequiredAcks = sarama.WaitForLocal // use Boolean filter instead
 	conf.Producer.Return.Errors = true

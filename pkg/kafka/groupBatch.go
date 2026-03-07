@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
-	"github.com/peterouob/seckill_service/app/seckill-service/pkg/model"
 	"github.com/peterouob/seckill_service/pkg/logger"
+	"github.com/peterouob/seckill_service/service/seckill-service/pkg/model"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
