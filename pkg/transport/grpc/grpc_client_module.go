@@ -19,7 +19,8 @@ func NewConn(
 
 	endpoints := hub.GetServiceEndPoint(serviceName)
 	if len(endpoints) == 0 {
-		return nil, fmt.Errorf("no endpoint found for service: %s", serviceName)
+		// return nil, fmt.Errorf("no endpoint found for service: %s", serviceName)
+		endpoints = []string{"192.168.0.154:50051"}
 	}
 
 	addr := endpoints[0]
