@@ -6,9 +6,7 @@ import (
 	"github.com/peterouob/seckill_service/service/seckill-service/internal/controller"
 )
 
-func InitRouter(ctl *controller.SeckillController) *gin.Engine {
-	r := gin.Default()
+func InitRouter(r *gin.Engine, ctl *controller.SeckillController) {
 	r.Use(middleware.AuthByJWT(), middleware.Cors())
 	r.POST("/buy", ctl.Buy)
-	return r
 }

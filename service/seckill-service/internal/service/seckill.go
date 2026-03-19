@@ -28,6 +28,7 @@ func NewSeckillService(repo repository.SeckillRepo, etcd *etcdregister.EtcdRegis
 	return s
 }
 
+// Buy TODO:when reduce success send to mq(tokenid,productId) and store in localcache (e.g. bolean filter)
 func (s *seckillServiceImpl) Buy(ctx context.Context, userId, productId string) error {
 	result, err := s.repo.DeductStock(ctx, productId, userId)
 	if err != nil {

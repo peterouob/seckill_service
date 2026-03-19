@@ -8,7 +8,6 @@ import (
 	etcdregister "github.com/peterouob/seckill_service/pkg/etcd"
 	"github.com/peterouob/seckill_service/pkg/kafka"
 	"github.com/peterouob/seckill_service/pkg/netutil"
-	transport "github.com/peterouob/seckill_service/pkg/transport/grpc"
 	"github.com/peterouob/seckill_service/service/seckill-service/cmd/module"
 	"go.uber.org/fx"
 )
@@ -27,7 +26,6 @@ func main() {
 		cache.RedisModule,
 		etcdregister.EtcdServerModule,
 		kafka.KafkaProducerModule,
-		transport.GrpcServerModule,
 		module.SeckillModule,
 	)
 	app.Run()
